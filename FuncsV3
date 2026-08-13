@@ -1,12 +1,33 @@
 local FuncsV3 = {}
-local SaveConfig = nil  
+
+-- [FIX] Default-nya table kosong, bukan nil. Ini mencegah crash total
+-- kalau ada orang lupa manggil SetTable() sebelum pakai Toggle/Dropdown/Textbox.
+local SaveConfig = {}
 
 local function Checker(Val, Val1, Val2)
   return typeof(Val) == Val1 and Val or Val2
 end
 
+-- [FIX] SafeGet: ambil value dari SaveConfig dengan aman.
+-- Kalau SaveConfig nil atau key gak ada, balikin fallback tanpa error.
+local function SafeGet(Key, Fallback)
+  if SaveConfig == nil then
+    return Fallback
+  end
+
+  local ok, Val = pcall(function()
+    return SaveConfig[Key]
+  end)
+
+  if not ok or Val == nil then
+    return Fallback
+  end
+
+  return Val
+end
+
 function FuncsV3:SetTable(path)
-  SaveConfig = path
+  SaveConfig = path or {}
 end
 
 function FuncsV3:Toggle(Tab, Name, Content, Default, Callback)
@@ -14,9 +35,9 @@ function FuncsV3:Toggle(Tab, Name, Content, Default, Callback)
   Content = Checker(Content, "string", tostring(Content))
   Callback = Checker(Callback, "function", function() end)
 
-  local _default = Default == "Save" 
-  and Checker(SaveConfig[Name], "boolean", false)
-  or Checker(Default, "boolean", false)
+  local _default = Default == "Save"
+    and Checker(SafeGet(Name, false), "boolean", false)
+    or Checker(Default, "boolean", false)
 
   return Tab:AddToggle({
     Title = Name,
@@ -49,16 +70,20 @@ function FuncsV3:Dropdown(Tab, Name, Content, multi, options, Default, Callback)
   local _default
 
   if Default == "Save" then
-    if type(SaveConfig[Name]) == "table" then
-      _default = SaveConfig[Name] or {""}
+    local Saved = SafeGet(Name, nil)
+    if type(Saved) == "table" then
+      _default = Saved
+    elseif Saved ~= nil then
+      _default = {Saved}
     else
-      _default = {SaveConfig[Name] or ""}
+      _default = {""}
     end
   else
-    if type(SaveConfig[Name] or Default) == "table" then
-      _default = SaveConfig[Name] or Default
+    local Saved = SafeGet(Name, Default)
+    if type(Saved) == "table" then
+      _default = Saved
     else
-      _default = {SaveConfig[Name] or Default}
+      _default = {Saved}
     end
   end
 
@@ -77,9 +102,9 @@ function FuncsV3:Textbox(Tab, Name, Content, Default, Callback)
   Content = Checker(Content, "string", tostring(Content))
   Callback = Checker(Callback, "function", function() end)
 
-  local _default = Default == "Save" 
-  and Checker(SaveConfig[Name], "string", "")
-  or Checker(Default, "string", "")
+  local _default = Default == "Save"
+    and Checker(SafeGet(Name, ""), "string", "")
+    or Checker(Default, "string", "")
 
   return Tab:AddInput({
     Title = Name,
